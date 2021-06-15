@@ -1,0 +1,21 @@
+[generators]
+cmake
+
+
+[requires]
+# Example library, replace with your own dependencies.
+boost/1.75.0
+
+
+[options]
+# Example setting, replace with your own settings.
+boost:header_only=True
+
+
+[imports]
+bin, *.dll -> ./bin
+lib, *.dll -> ./bin
+bin, *.dylib -> ./bin
+lib, *.dylib -> ./bin
+bin, *.so -> ./bin
+lib, *.so -> ./bin
