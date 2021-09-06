@@ -52,6 +52,13 @@ if (EXISTS ${CMAKE_SOURCE_DIR}/out/conan/bin)
 endif()
 
 
+# Enable testing (Each subproject can add its own tests.)
+if (${ENABLE_TESTING})
+    message(STATUS "Test generation is enabled.")
+    enable_testing()
+endif()
+
+
 # Add subprojects.
 add_subdirectory(DemoLib)
 add_subdirectory(DemoExecutable)

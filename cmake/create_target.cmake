@@ -50,10 +50,6 @@ function(create_target_filtered name type major minor patch filter)
         # Tests cannot have nested tests. Only add tests if the current target is itself not a test.
         # (Note: test names are guaranteed to start with test_)
         if (NOT ${name} MATCHES "test_.+" AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
-            include(CTest)
-            enable_testing()
-
-
             # Get test files for target.
             file(GLOB_RECURSE tests CONFIGURE_DEPENDS LIST_DIRECTORIES false "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
 
@@ -65,6 +61,13 @@ function(create_target_filtered name type major minor patch filter)
 
                 # Create executable
                 add_executable(test_${test_name} ${test})
+
+                # Add executable as test
+                add_test(
+                    NAME ${test_name}
+                    COMMAND test_${test_name}
+                    WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+                )
 
                 # Add dependencies.
                 target_link_libraries(test_${test_name} PUBLIC ${name})
