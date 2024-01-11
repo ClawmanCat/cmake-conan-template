@@ -52,7 +52,7 @@ jobs:
       id: strings
       shell: bash
       run: |
-        echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+        echo "build-output-dir=${{ github.workspace }}/out" >> "$GITHUB_OUTPUT"
 
     - name: Install Conan
       run: >
@@ -83,5 +83,5 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         path: ./
-        name: all-artifacts
+        name: whole-repo
         retention-days: 1
