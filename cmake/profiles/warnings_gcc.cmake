@@ -37,7 +37,4 @@ FUNCTION(SET_COMPILER_WARNINGS)
 
     # Allow lookup into dependent base classes.
     ADD_COMPILE_OPTIONS(-Wno-microsoft-template)
-
-    # Conan packages don't have PDBs. We don't need a warning for every package that there is no debug info.
-    ADD_LINK_OPTIONS(/ignore:4099)
 ENDFUNCTION()
