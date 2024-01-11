@@ -1,80 +1,184 @@
-# Creates a target in the current directory with the given name and type (EXECUTABLE, INTERFACE, etc.).
-# A list of targets can be provided as variadic parameters to pass a list of dependencies for the target.
-function(create_target name type major minor patch)
-    create_target_filtered(${name} ${type} ${major} ${minor} ${patch} "__NONEXISTENT_FILENAME__" ${ARGN})
-endfunction()
+# Create a new target with the given name, version and type.
+# Pass list of dependency targets as ARGN.
+FUNCTION(CREATE_TARGET NAME MAJOR MINOR PATCH CMAKE_TARGET_TYPE COMPONENT_TYPE)
+    FILE(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS LIST_DIRECTORIES FALSE "*.cpp" "*.hpp")
+    LIST(FILTER SOURCES EXCLUDE REGEX "${CMAKE_CURRENT_SOURCE_DIR}\\/tests\\/.*")
+
+    CREATE_TARGET_FROM_SOURCES(
+        ${NAME}
+        ${MAJOR} ${MINOR} ${PATCH}
+        ${CMAKE_TARGET_TYPE} ${COMPONENT_TYPE}
+        "${SOURCES}"
+        ${ARGN}
+    )
+ENDFUNCTION()
 
 
-# Equivalent to the above function, but a regex filter can be provided to prevent
-# the inclusion of certain source files from the target
-function(create_target_filtered name type major minor patch filter)
-    include(utility)
 
 
-    # Get source files for target.
-    file(GLOB_RECURSE sources CONFIGURE DEPENDS LIST_DIRECTORIES false "*.cpp")
-    list(FILTER sources EXCLUDE REGEX "${CMAKE_CURRENT_SOURCE_DIR}\\/tests\\/.*")
-    list(FILTER sources EXCLUDE REGEX ${filter})
+# Create a new target with the given name, version and type, using the provided source files.
+# Pass list of dependency targets as ARGN.
+FUNCTION(CREATE_TARGET_FROM_SOURCES NAME MAJOR MINOR PATCH CMAKE_TARGET_TYPE COMPONENT_TYPE SOURCES)
+    # Assert target types have valid values.
+    SET(ALLOWED_CMAKE_TARGET_TYPES "EXECUTABLE" "INTERFACE" "OBJECT" "SHARED" "STATIC")
+    SET(ALLOWED_COMPONENT_TYPES "COMPONENT" "PLUGIN" "TEST")
+
+    IF (NOT "${CMAKE_TARGET_TYPE}" IN_LIST ALLOWED_CMAKE_TARGET_TYPES)
+        MESSAGE(FATAL_ERROR "Unknown CMake target type: ${CMAKE_TARGET_TYPE}. Value must be one of: ${ALLOWED_CMAKE_TARGET_TYPES}")
+    ENDIF()
+
+    IF (NOT "${COMPONENT_TYPE}" IN_LIST ALLOWED_COMPONENT_TYPES)
+        MESSAGE(FATAL_ERROR "Unknown VoxelEngine target type: ${COMPONENT_TYPE}. Value must be one of: ${ALLOWED_COMPONENT_TYPES}")
+    ENDIF()
 
 
-    # Create target of correct type and add sources.
-    if (${type} STREQUAL "EXECUTABLE")
-        add_executable(${name} ${sources})
-    elseif (${type} STREQUAL "INTERFACE")
-        add_library(${name} ${type})
-        target_sources(${sources})
-    else ()
-        add_library(${name} ${type} ${sources})
-    endif()
+    # Create CMake target.
+    IF (${CMAKE_TARGET_TYPE} STREQUAL "EXECUTABLE")
+        ADD_EXECUTABLE(${NAME} ${SOURCES})
+        # Required for linking the tests.
+        SET_TARGET_PROPERTIES(${NAME} PROPERTIES ENABLE_EXPORTS ON)
+    ELSEIF (${CMAKE_TARGET_TYPE} STREQUAL "INTERFACE")
+        ADD_LIBRARY(${NAME} ${CMAKE_TARGET_TYPE})
+        TARGET_SOURCES(${NAME} ${SOURCES})
+    ELSE()
+        ADD_LIBRARY(${NAME} ${CMAKE_TARGET_TYPE} ${SOURCES})
+    ENDIF()
+
+    SET_TARGET_PROPERTIES(${NAME} PROPERTIES LINKER_LANGUAGE CXX)
 
 
     # Add dependencies.
-    target_link_libraries_system(${name} ${ARGN})
+    TARGET_LINK_LIBRARIES(${NAME} ${ARGN})
 
 
-    # Specifying the linker language manually is required for header only libraries,
-    # since the language cannot be deduced from the file extension.
-    set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
+    # Set output directories depending on COMPONENT_TYPE (Either the root output directory or the plugins or test folder in said directory).
+    IF ("${COMPONENT_TYPE}" STREQUAL "COMPONENT")
+        SET(OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/out/${PROFILE_NAME}/bin")
+    ELSEIF ("${COMPONENT_TYPE}" STREQUAL "PLUGIN")
+        SET(OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/out/${PROFILE_NAME}/bin/plugins/${NAME}")
+    ELSE ()
+        SET(OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/out/${PROFILE_NAME}/bin/tests/${NAME}")
+    ENDIF()
+
+    SET_TARGET_PROPERTIES(${NAME} PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${OUTPUT_DIRECTORY})
+    SET_TARGET_PROPERTIES(${NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${OUTPUT_DIRECTORY})
+    SET_TARGET_PROPERTIES(${NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIRECTORY})
 
 
-    # Add preprocessor definitions for the target version.
-    string(TOUPPER ${name} name_capitalized)
-    target_compile_definitions(${name} PUBLIC "${name_capitalized}_VERSION_MAJOR=${major}")
-    target_compile_definitions(${name} PUBLIC "${name_capitalized}_VERSION_MINOR=${minor}")
-    target_compile_definitions(${name} PUBLIC "${name_capitalized}_VERSION_PATCH=${patch}")
+    # Set CMake information for target.
+    SET(${NAME}_SOURCE_DIR        ${CMAKE_CURRENT_SOURCE_DIR} CACHE INTERNAL "")
+    SET(${NAME}_OUTPUT_DIR        ${OUTPUT_DIRECTORY}         CACHE INTERNAL "")
+    SET(${NAME}_CMAKE_TARGET_TYPE ${CMAKE_TARGET_TYPE}        CACHE INTERNAL "")
+    SET(${NAME}_COMPONENT_TYPE    ${COMPONENT_TYPE}           CACHE INTERNAL "")
+    SET(${NAME}_VERSION_MAJOR     ${MAJOR}                    CACHE INTERNAL "")
+    SET(${NAME}_VERSION_MINOR     ${MINOR}                    CACHE INTERNAL "")
+    SET(${NAME}_VERSION_PATCH     ${PATCH}                    CACHE INTERNAL "")
+    SET(${NAME}_SOURCE_LIST       "${SOURCES}"                CACHE INTERNAL "")
 
 
-    # A target may contain a test folder. Each cpp file in such a folder should be turned into a new target.
-    # (But only if ENABLE_TESTING is set.)
-    if (${ENABLE_TESTING})
-        # Tests cannot have nested tests. Only add tests if the current target is itself not a test.
-        # (Note: test names are guaranteed to start with test_)
-        if (NOT ${name} MATCHES "test_.+" AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
-            # Get test files for target.
-            file(GLOB_RECURSE tests CONFIGURE_DEPENDS LIST_DIRECTORIES false "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp")
+    # Create test targets.
+    CREATE_TESTS_FOR_TARGET(${NAME} GENERATED_TEST_LIST ${ARGN})
+    SET(${NAME}_TEST_LIST "${GENERATED_TEST_LIST}" CACHE INTERNAL "")
 
 
-            # Create a test for each source file.
-            foreach(test IN ITEMS ${tests})
-                get_filename_component(test_name ${test} NAME_WE)
-                message(STATUS "Creating test ${test_name}.")
+    # Set preprocessor information for target.
+    STRING(TOUPPER ${NAME} NAME_UPPER)
+    TARGET_COMPILE_DEFINITIONS(${NAME} PUBLIC "${NAME_UPPER}_VERSION_MAJOR=${MAJOR}")
+    TARGET_COMPILE_DEFINITIONS(${NAME} PUBLIC "${NAME_UPPER}_VERSION_MINOR=${MINOR}")
+    TARGET_COMPILE_DEFINITIONS(${NAME} PUBLIC "${NAME_UPPER}_VERSION_PATCH=${PATCH}")
 
-                # Create executable
-                add_executable(test_${test_name} ${test})
 
-                # Add executable as test
-                add_test(
-                    NAME ${test_name}
-                    COMMAND test_${test_name}
-                    WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    # Symlink or copy assets folder.
+    IF (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets" AND IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+        IF (SYMLINK_ASSETS)
+            FILE(MAKE_DIRECTORY "${OUTPUT_DIRECTORY}/assets")
+
+            # On Windows, creating a symlink requires administrator privileges, so create a directory junction instead.
+            IF (WIN32)
+                IF (NOT EXISTS "${OUTPUT_DIRECTORY}/assets/${NAME}")
+                    ADD_CUSTOM_TARGET(
+                        "SYMLINK_ASSETS_FOR_${NAME}"
+                        COMMAND mklink /j "\"${OUTPUT_DIRECTORY}/assets/${NAME}\"" "\"${CMAKE_CURRENT_SOURCE_DIR}/assets\""
+                    )
+
+
+                    ADD_DEPENDENCIES("${NAME}" "SYMLINK_ASSETS_FOR_${NAME}")
+                ENDIF()
+            ELSE()
+                ADD_CUSTOM_TARGET(
+                    "SYMLINK_ASSETS_FOR_${NAME}"
+                    COMMAND ${CMAKE_COMMAND} -E create_symlink "\"${CMAKE_CURRENT_SOURCE_DIR}/assets\"" "\"${OUTPUT_DIRECTORY}/assets/${NAME}\""
+                    VERBATIM
                 )
 
-                # Add dependencies.
-                target_link_libraries(test_${test_name} PUBLIC ${name})
 
-                # Prevent linker language errors on header only libraries.
-                set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
-            endforeach()
-        endif()
-    endif()
-endfunction()
+                ADD_DEPENDENCIES("${NAME}" "SYMLINK_ASSETS_FOR_${NAME}")
+            ENDIF()
+        ELSE()
+            FILE(GLOB_RECURSE ASSETS CONFIGURE_DEPENDS LIST_DIRECTORIES OFF "${CMAKE_CURRENT_SOURCE_DIR}/assets/*")
+
+
+            FOREACH (ASSET IN ITEMS ${ASSETS})
+                FILE(RELATIVE_PATH RELATIVE_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets" "${ASSET}")
+                CONFIGURE_FILE("${CMAKE_CURRENT_SOURCE_DIR}/assets/${RELATIVE_ASSET_PATH}" "${OUTPUT_DIRECTORY}/assets/${RELATIVE_ASSET_PATH}" COPYONLY)
+            ENDFOREACH()
+        ENDIF()
+    ENDIF()
+
+
+    # Print debug message that target was created.
+    LIST(LENGTH SOURCES NUM_SOURCES)
+    MESSAGE(STATUS "Created target ${NAME} (${COMPONENT_TYPE}/${CMAKE_TARGET_TYPE}) with ${NUM_SOURCES} sources.")
+ENDFUNCTION()
+
+
+
+
+# Generates new targets for every .cpp file in the given target's tests folder,
+# and returns a list of generated targets into the provided variable.
+FUNCTION(CREATE_TESTS_FOR_TARGET TARGET TEST_LIST_OUTPUT_VAR)
+    # Skip if testing is not enabled.
+    IF (NOT ${ENABLE_TESTING})
+        RETURN()
+    ENDIF()
+
+    # Test targets cannot have tests themselves.
+    IF (${TARGET} MATCHES "test_*")
+        RETURN()
+    ENDIF()
+
+    # Skip if there is no tests folder.
+    IF (NOT EXISTS "${${TARGET}_SOURCE_DIR}/tests")
+        RETURN()
+    ENDIF()
+
+
+    # Find test sources.
+    FILE(GLOB_RECURSE TESTS CONFIGURE_DEPENDS LIST_DIRECTORIES FALSE "${${TARGET}_SOURCE_DIR}/tests/*.cpp")
+
+
+    # Generate test targets.
+    INCLUDE(CTest)
+
+    FOREACH(TEST IN ITEMS ${TESTS})
+        GET_FILENAME_COMPONENT(TEST_NAME ${TEST} NAME_WE)
+        SET(TEST_NAME test_${TEST_NAME})
+
+
+        CREATE_TARGET_FROM_SOURCES(
+            ${TEST_NAME}
+            ${${TARGET}_VERSION_MAJOR} ${${TARGET}_VERSION_MINOR} ${${TARGET}_VERSION_PATCH}
+            EXECUTABLE TEST
+            "${TEST}"
+            PUBLIC ${TARGET}
+            ${ARGN}
+        )
+
+
+        ADD_TEST(NAME ${TEST_NAME} COMMAND ${TEST_NAME} WORKING_DIRECTORY "${${NAME}_OUTPUT_DIRECTORY}")
+    ENDFOREACH()
+
+
+    # Return list of tests to parent.
+    SET(${TEST_LIST_OUTPUT_VAR} "${TESTS}" PARENT_SCOPE)
+ENDFUNCTION()

@@ -1,64 +1,73 @@
-cmake_minimum_required(VERSION 3.19)
-project("CMake Conan Demo")
+CMAKE_MINIMUM_REQUIRED(VERSION 3.19)
+PROJECT("CMake Conan Template")
+
+
+# Prevent concurrent CMake runs.
+FILE(LOCK ${CMAKE_SOURCE_DIR}/cmake.lock)
+
+
+# Get compiler name and build type.
+STRING(TOLOWER ${CMAKE_CXX_COMPILER_ID} CXX_COMPILER_ID_LOWER)
+STRING(TOLOWER ${CMAKE_BUILD_TYPE} BUILD_TYPE_LOWER)
+
+# RelWithDebInfo -> FastDebug
+IF (${BUILD_TYPE_LOWER} STREQUAL "relwithdebinfo")
+    SET(BUILD_TYPE_LOWER "fastdebug")
+ENDIF()
+
+
+# Command line options.
+SET(SYMLINK_ASSETS ON CACHE BOOL "Generate symlinks for the assets folder rather than copying it.")
+SET(ENABLE_TESTING ON CACHE BOOL "Generate test targets.")
+SET(PROFILE_NAME "${CXX_COMPILER_ID_LOWER}-${BUILD_TYPE_LOWER}" CACHE STRING "Name of the current CMake profile. Will be used as the folder name for build artifacts.")
+SET(COMPILER_PROFILE ON CACHE BOOL "Use a preconfigured profile with compiler-specific settings for e.g. warnings.")
+SET(WARNINGS_ARE_ERRORS ON CACHE BOOL "Treat all warnings as errors.")
+
+
+# Change to require a specific C++ version.
+SET(CMAKE_CXX_STANDARD 17)
+SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+
+# Export all symbols on Windows.
+# TODO: Replace this with SymbolGenerator later!
+SET(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 
 # Allow loading of scripts from cmake folder.
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
-
-# Allow including from the root directory.
-include_directories(${CMAKE_SOURCE_DIR})
-
+SET(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 # Store builds in out folder.
-set(CMAKE_BINARY_DIR "${CMAKE_SOURCE_DIR}/out")
+SET(CMAKE_BINARY_DIR "${CMAKE_SOURCE_DIR}/out")
+# Allow including from the root directory.
+INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR})
 
-# Output to out directory.
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/out/${CMAKE_BUILD_TYPE}/lib)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/out/${CMAKE_BUILD_TYPE}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/out/${CMAKE_BUILD_TYPE}/bin)
+
+# Enable Testing
+IF (ENABLE_TESTING)
+    INCLUDE(CTest)
+    ENABLE_TESTING()
+ENDIF()
 
 
 # Install Dependencies
-include(run_conan)
-
-select_conan_profile(conan_profile)
-run_conan(${conan_profile})
-
-# Enable compiler-specific warnings
-include(compiler_profile)
-set_compiler_profile()
+INCLUDE(install_dependencies)
+INSTALL_GIT_DEPENDENCIES()
+INSTALL_CONAN_DEPENDENCIES()
 
 
-# Make sure symbols are exported on Windows.
-# (This prevents requiring specifying dllexport / dllimport everywhere.)
-set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
-
-
-# Copy required directories to binary folder.
-add_custom_target(
-    COPY_OUT_DIRS ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/out_dirs
-        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-)
-
-# Copy shared libraries from conan folder to binary folder.
-if (EXISTS ${CMAKE_SOURCE_DIR}/out/conan/bin)
-    add_custom_target(
-        COPY_SHARED_LIBS ALL
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${CMAKE_SOURCE_DIR}/out/conan/bin
-            ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
-    )
-endif()
-
-
-# Enable testing (Each subproject can add its own tests.)
-if (${ENABLE_TESTING})
-    message(STATUS "Test generation is enabled.")
-    enable_testing()
-endif()
+# Enable compiler-specific compatibility flags and warnings.
+IF (COMPILER_PROFILE)
+    INCLUDE(compiler_config)
+    CONFIGURE_COMPILER()
+ENDIF()
 
 
 # Add subprojects.
-add_subdirectory(DemoLib)
-add_subdirectory(DemoExecutable)
+FILE(GLOB SUBFOLDERS CONFIGURE_DEPENDS LIST_DIRECTORIES ON "*")
+
+FOREACH (SUBFOLDER IN ITEMS ${SUBFOLDERS})
+    IF (IS_DIRECTORY "${SUBFOLDER}" AND EXISTS "${SUBFOLDER}/CMakeLists.txt")
+        MESSAGE(STATUS "Found Target Subdirectory ${SUBFOLDER}.")
+        ADD_SUBDIRECTORY(${SUBFOLDER})
+    ENDIF()
+ENDFOREACH()

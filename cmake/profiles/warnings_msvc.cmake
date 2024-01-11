@@ -1,38 +1,19 @@
-# For MSVC several default parameters get defined which are not necessarily the ones we want.
-# Simply trying to override them causes both versions of the parameter to get passed to the compiler,
-# causing numerous issues.
-# To fix this, we have to check if the setting is set by one of the default parameter lists, and if so, remove it
-# before setting each parameter.
-function(set_compiler_option prefix option)
-    set(
-        argument_lists
-        CMAKE_CXX_FLAGS_DEBUG_INIT
-        CMAKE_CXX_FLAGS_RELEASE_INIT
-        CMAKE_CXX_FLAGS_MINSIZEREL_INIT
-        CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT
-        CMAKE_CXX_FLAGS_INIT
-    )
+FUNCTION(SET_COMPILER_WARNINGS)
+    IF (WARNINGS_ARE_ERRORS)
+        ADD_COMPILE_OPTIONS(/WX)
+    ENDIF()
 
-
-    foreach (list IN ITEMS ${argument_list})
-        string (REGEX REPLACE "/${prefix}:[^\\s]+" "/${prefix}:${option}" ${list} ${${list}})
-    endforeach()
-endfunction()
-
-
-function(load_compiler_profile)
-    # Note: replace with the required C++ standard version.
-    # (MSVC ignores CMAKE_CXX_STANDARD)
-    set_compiler_option(std c++latest)
-
-    # Disable warnings in external libraries.
-    add_compile_options(/experimental:external)
-    add_compile_options(/experimental:W0)
 
     # Enable extra warnings.
-    add_compile_options(/W4)
+    ADD_COMPILE_OPTIONS(/W4)
 
-    add_compile_options(
+
+    # Disable warnings in external libraries.
+    ADD_COMPILE_OPTIONS(/external:W0)
+
+
+    # Add additional warnings not covered by /W4.
+    ADD_COMPILE_OPTIONS(
         /w34265 # No virtual dtor
         /w34464 # ../ in relative include
         /w34547 # No effect operation before comma
@@ -60,8 +41,9 @@ function(load_compiler_profile)
         /w34928 # Illegal copy-initialization
     )
 
+
     # Disable different warnings.
-    add_compile_options(
+    ADD_COMPILE_OPTIONS(
         /wd4068 # Don't warn on pragmas intended for different compilers
         /wd4103 # Pragma push without pop. These get triggered from included files, even if they are marked as external,
                 # since they change the alignment of the file that includes them too
@@ -71,4 +53,4 @@ function(load_compiler_profile)
         /wd4458 # Declaration hides class member.
                 # Shadowing is done intentionally in many places, e.g.: void set_x(T x) { this->x = x; }
     )
-endfunction()
+ENDFUNCTION()

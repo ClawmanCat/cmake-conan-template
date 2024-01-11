@@ -1,14 +1,15 @@
-include(create_target)
-include(generate_include_header)
+INCLUDE(create_target)
+INCLUDE(create_include_header)
 
 
-create_target(
+CREATE_TARGET(
     DemoLib
-    OBJECT
     0 0 1
+    OBJECT COMPONENT
     # Dependencies:
     PUBLIC CONAN_PKG::boost
 )
 
+
 # Will generate a single-include header for all headers in some_package.
-generate_include_header(DemoLib some_package package.hpp)
+CREATE_INCLUDE_HEADER(DemoLib some_package package.hpp)

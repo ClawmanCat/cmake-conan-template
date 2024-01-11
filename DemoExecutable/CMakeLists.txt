@@ -1,9 +1,10 @@
-include(create_target)
+INCLUDE(create_target)
 
-create_target(
+
+CREATE_TARGET(
     DemoExecutable
-    EXECUTABLE
     0 0 1
+    EXECUTABLE COMPONENT
     # Dependencies:
     PUBLIC DemoLib
 )
