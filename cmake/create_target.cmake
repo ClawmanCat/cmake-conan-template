@@ -107,7 +107,7 @@ FUNCTION(CREATE_TARGET_FROM_SOURCES NAME MAJOR MINOR PATCH CMAKE_TARGET_TYPE COM
             ELSE()
                 ADD_CUSTOM_TARGET(
                     "SYMLINK_ASSETS_FOR_${NAME}"
-                    COMMAND ${CMAKE_COMMAND} -E create_symlink "\"${OUTPUT_DIRECTORY}/assets/${NAME}\"" "\"${CMAKE_CURRENT_SOURCE_DIR}/assets\""
+                    COMMAND ${CMAKE_COMMAND} -E create_symlink "${CMAKE_CURRENT_SOURCE_DIR}/assets" "${OUTPUT_DIRECTORY}/assets/${NAME}"
                     VERBATIM
                 )
 
