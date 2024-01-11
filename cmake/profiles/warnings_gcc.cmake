@@ -32,9 +32,6 @@ FUNCTION(SET_COMPILER_WARNINGS)
     ADD_COMPILE_OPTIONS(-Wno-unused-function)
     ADD_COMPILE_OPTIONS(-Wno-unused-local-typedef)
 
-    # Usage of magic_enum requires a large recursion depth.
-    ADD_COMPILE_OPTIONS(-fbracket-depth=1024)
-
     # Don't hide part of the backtrace for template errors.
     ADD_COMPILE_OPTIONS(-ftemplate-backtrace-limit=0)
 
