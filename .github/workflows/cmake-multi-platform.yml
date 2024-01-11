@@ -82,5 +82,6 @@ jobs:
     - name: Archive Artifacts
       uses: actions/upload-artifact@v3
       with:
+        path: ./
         name: all-artifacts
         retention-days: 1
