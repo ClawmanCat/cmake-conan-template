@@ -10,6 +10,7 @@ This template offers the following features:
 - Component/Plugin system for managing the output location of each target.
 - Optional compiler profiles to easily enable extra compiler-specific warnings.
 - Preconfigured Doxygen and clang-format configuration files.
+- Preconfigured Github Actions pipelines for cross-plaform development.
 
 Please check the root `CMakeLists.txt` or use a CMake GUI to see all configuration options.
 
