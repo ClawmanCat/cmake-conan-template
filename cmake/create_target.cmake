@@ -89,16 +89,25 @@ FUNCTION(CREATE_TARGET_FROM_SOURCES NAME MAJOR MINOR PATCH CMAKE_TARGET_TYPE COM
 
 
     # Symlink or copy assets folder.
-    IF (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets" AND IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+    IF ("${COMPONENT_TYPE}" STREQUAL "TEST")
+        SET(ASSETS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/tests/assets")
+    ELSE()
+        SET(ASSETS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+    ENDIF()
+
+    SET(ASSETS_DST "${OUTPUT_DIRECTORY}/assets")
+
+
+    IF (EXISTS "${ASSETS_SRC}" AND IS_DIRECTORY "${ASSETS_SRC}")
         IF (SYMLINK_ASSETS)
-            FILE(MAKE_DIRECTORY "${OUTPUT_DIRECTORY}/assets")
+            FILE(MAKE_DIRECTORY "${ASSETS_DST}")
 
             # On Windows, creating a symlink requires administrator privileges, so create a directory junction instead.
             IF (WIN32)
-                IF (NOT EXISTS "${OUTPUT_DIRECTORY}/assets/${NAME}")
+                IF (NOT EXISTS "${ASSETS_DST}/${NAME}")
                     ADD_CUSTOM_TARGET(
                         "SYMLINK_ASSETS_FOR_${NAME}"
-                        COMMAND mklink /j "\"${OUTPUT_DIRECTORY}/assets/${NAME}\"" "\"${CMAKE_CURRENT_SOURCE_DIR}/assets\""
+                        COMMAND mklink /j "\"${ASSETS_DST}/${NAME}\"" "\"${ASSETS_SRC}\""
                     )
 
 
@@ -107,7 +116,7 @@ FUNCTION(CREATE_TARGET_FROM_SOURCES NAME MAJOR MINOR PATCH CMAKE_TARGET_TYPE COM
             ELSE()
                 ADD_CUSTOM_TARGET(
                     "SYMLINK_ASSETS_FOR_${NAME}"
-                    COMMAND ${CMAKE_COMMAND} -E create_symlink "${CMAKE_CURRENT_SOURCE_DIR}/assets" "${OUTPUT_DIRECTORY}/assets/${NAME}"
+                    COMMAND ${CMAKE_COMMAND} -E create_symlink "${ASSETS_SRC}" "${ASSETS_DST}/${NAME}"
                     VERBATIM
                 )
 
@@ -115,12 +124,12 @@ FUNCTION(CREATE_TARGET_FROM_SOURCES NAME MAJOR MINOR PATCH CMAKE_TARGET_TYPE COM
                 ADD_DEPENDENCIES("${NAME}" "SYMLINK_ASSETS_FOR_${NAME}")
             ENDIF()
         ELSE()
-            FILE(GLOB_RECURSE ASSETS CONFIGURE_DEPENDS LIST_DIRECTORIES OFF "${CMAKE_CURRENT_SOURCE_DIR}/assets/*")
+            FILE(GLOB_RECURSE ASSETS CONFIGURE_DEPENDS LIST_DIRECTORIES OFF "${ASSETS_SRC}/*")
 
 
             FOREACH (ASSET IN ITEMS ${ASSETS})
-                FILE(RELATIVE_PATH RELATIVE_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets" "${ASSET}")
-                CONFIGURE_FILE("${CMAKE_CURRENT_SOURCE_DIR}/assets/${RELATIVE_ASSET_PATH}" "${OUTPUT_DIRECTORY}/assets/${RELATIVE_ASSET_PATH}" COPYONLY)
+                FILE(RELATIVE_PATH RELATIVE_ASSET_PATH "${ASSETS_SRC}" "${ASSET}")
+                CONFIGURE_FILE("${ASSETS_SRC}/${RELATIVE_ASSET_PATH}" "${ASSETS_DST}/${NAME}/${RELATIVE_ASSET_PATH}" COPYONLY)
             ENDFOREACH()
         ENDIF()
     ENDIF()
