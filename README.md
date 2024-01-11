@@ -18,13 +18,14 @@ Please check the root `CMakeLists.txt` or use a CMake GUI to see all configurati
 ### Building
 You should install CMake (3.19 or newer), Conan (available through pip, currently Conan 2 is not supported) and have some generator (Visual Studio, Ninja, Makefile, etc.) installed.  
 
-To set up and build your project (with Ninja):
+To set up and build your project:
 ```shell
 mkdir out
 cd out
 
+# Using Ninja here as an example but any generator is supported.
 cmake -G Ninja -DCMAKE_BUILD_TYPE=[DEBUG|RELEASE] -DENABLE_TESTS=[ON|OFF] -DCMAKE_C_COMPILER=[Compiler] -DCMAKE_CXX_COMPILER=[Compiler] ../
-cmake --build ./[debug|release] --target all
+cmake --build ./ --target all
 ```
 (or just call CMake through your IDE)
 
@@ -70,8 +71,9 @@ To build and run your tests, simply invoke `ctest` after building your project w
 mkdir out
 cd out
 
+# Using Ninja here as an example but any generator is supported.
 cmake -G Ninja -DENABLE_TESTS=ON -DCMAKE_BUILD_TYPE=[DEBUG|RELEASE] -DCMAKE_C_COMPILER=[Compiler] -DCMAKE_CXX_COMPILER=[Compiler] ../
-cmake --build ./[debug|release] --target all
+cmake --build ./ --target all
 
 ctest
 ```
