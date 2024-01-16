@@ -54,10 +54,6 @@ jobs:
       run: |
         echo "build-output-dir=${{ github.workspace }}/out" >> "$GITHUB_OUTPUT"
 
-    - name: Install Conan
-      run: >
-        pip install conan==1.59.0
-
     - name: Create output directory
       run: >
         mkdir out
